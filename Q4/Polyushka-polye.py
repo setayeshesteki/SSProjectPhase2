@@ -8,53 +8,41 @@ img = cv.imread("Polye.png", cv.IMREAD_GRAYSCALE)
 
 
 def detectLines(img):
-    dst = cv.Canny(img, 50, 200, None, 3)
-
-    cdst = cv.cvtColor(dst, cv.COLOR_GRAY2BGR)
-
-    linesP = cv.HoughLinesP(dst, 1, np.pi / 180, 50, None, 50, 10)
+    edges = cv.Canny(img, 50, 200, None, 3)
+    cdst = cv.cvtColor(edges, cv.COLOR_GRAY2BGR)
+    linesP = cv.HoughLinesP(edges, 1, np.pi / 180, 50, None, 50, 10)
 
     lines_x = []
     lines_y = []
 
-    for i in range(0, len(linesP)):
-        l = linesP[i][0]
+    for line in linesP:
+        x1, y1, x2, y2 = line[0]
 
-        if (abs(l[0] - l[2]) <= 1):
+        if abs(x1 - x2) <= 1:
             continue
 
-        if (lines_x == [] or lines_y == []):
-            lines_x.append(l[0])
-            lines_y.append(l[1])
-
-        if (abs(lines_y[-1] - l[1]) < 1):
+        if lines_x and lines_y and abs(lines_y[-1] - y1) < 1:
             continue
-        else:
-            lines_x.append(l[0])
-            lines_y.append(l[1])
 
-    lines_x = np.asarray(lines_x)
-    lines_y = np.asarray(lines_y)
+        lines_x.append(x1)
+        lines_y.append(y1)
 
-    index = np.argsort(lines_y)
-    lines_x = lines_x[index]
-    lines_y = lines_y[index]
+    lines_x = np.array(lines_x)
+    lines_y = np.array(lines_y)
 
     diff = np.diff(lines_y)
-    indices_toKeep = [0]
-    for i in range(diff.shape[-1]):
-        if (diff[i] > 5):
-            indices_toKeep.append(i + 1)
-
-    lines_x = lines_x[indices_toKeep]
-    lines_y = lines_y[indices_toKeep]
+    indices_to_keep = np.where(diff > 5)[0] + 1
+    lines_x = lines_x[indices_to_keep]
+    lines_y = lines_y[indices_to_keep]
     lines_y[4] -= 1
     lines_y = np.delete(lines_y, [5, 11])
 
-    for i in range(lines_y.shape[-1]):
-        cv.line(cdst, (0, lines_y[i]), (1740, lines_y[i]), (0, 0, 255), 3, cv.LINE_AA)
+    for y in lines_y:
+        cv.line(cdst, (0, y), (1740, y), (0, 0, 255), 3, cv.LINE_AA)
 
     return lines_x, lines_y, cdst
+
+
 
 lines_x, lines_y, cdst = detectLines(img)
 
@@ -99,28 +87,22 @@ def detectNotes(img, template, threshold, dur, down):
     return rects, img2
 
 
+import numpy as np
+
 def attachNotes(rectsQ, rectsH, rectsW, rectsH2):
-    rects = np.ndarray.tolist(rectsQ)
-    rects.extend(np.ndarray.tolist(rectsH))
-    rects.extend(np.ndarray.tolist(rectsW))
-    rects.extend(np.ndarray.tolist(rectsH2))
+    rects = np.vstack((rectsQ, rectsH, rectsW, rectsH2))
+    sorted_rects = rects[np.lexsort((rects[:, 1], rects[:, 0]))]
+    return sorted_rects
 
-    rects = sorted(rects, key=lambda x: (x[0], x[1]))
 
-    rects = np.asarray(rects)
 
-    return rects
 
 
 def attachExtensions(rectsS, rectsF):
-    rects = np.ndarray.tolist(rectsS)
-    rects.extend(np.ndarray.tolist(rectsF))
+    rects = np.vstack((rectsS, rectsF))
+    sorted_rects = sorted(rects, key=lambda x: (x[0], x[1]))
+    return np.array(sorted_rects)
 
-    rects = sorted(rects, key=lambda x: (x[0], x[1]))
-
-    rects = np.asarray(rects)
-
-    return rects
 
 template1 = cv.imread("quarter.PNG", cv.IMREAD_GRAYSCALE)
 template2 = cv.imread("half.PNG", cv.IMREAD_GRAYSCALE)
